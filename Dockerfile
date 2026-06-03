@@ -2,18 +2,19 @@ FROM ubuntu:24.04
 
 ARG KOMARI_AGENT_VERSION=latest
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    HEALTH_PORT=8000
-
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates wget bash python3; \
-    arch="$(uname -m)"; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      ca-certificates \
+      wget \
+      bash \
+      python3; \
+    arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
-      x86_64) agent_arch="amd64" ;; \
-      aarch64|arm64) agent_arch="arm64" ;; \
-      i386|i686) agent_arch="386" ;; \
-      armv7*|armv6*) agent_arch="arm" ;; \
+      amd64) agent_arch="amd64" ;; \
+      arm64) agent_arch="arm64" ;; \
+      armhf|armel) agent_arch="arm" ;; \
+      i386) agent_arch="386" ;; \
       *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
     esac; \
     if [ "$KOMARI_AGENT_VERSION" = "latest" ]; then \
