@@ -4,10 +4,10 @@ set -Eeuo pipefail
 : "${AGENT_ENDPOINT:?请设置 AGENT_ENDPOINT}"
 : "${AGENT_TOKEN:?请设置 AGENT_TOKEN}"
 
-# DCDeploy 健康检查端口，固定 8000，不需要写环境变量
+# DCDeploy 健康检查端口
 HEALTH_PORT=8000
 
-# Komari Agent 参数，直接写死在脚本里，不需要写环境变量
+# Komari Agent 固定参数，不写到环境变量里
 MAX_RETRIES=999999
 RECONNECT_INTERVAL=10
 REPORT_INTERVAL=5.0
@@ -35,37 +35,62 @@ if ! kill -0 "${HEALTH_PID}" 2>/dev/null; then
   exit 1
 fi
 
-echo "Starting Komari Agent..."
-echo "Endpoint: ${AGENT_ENDPOINT}"
-
-/usr/local/bin/komari-agent \
-  --endpoint "${AGENT_ENDPOINT}" \
-  --token "${AGENT_TOKEN}" \
-  --max-retries "${MAX_RETRIES}" \
-  --reconnect-interval "${RECONNECT_INTERVAL}" \
-  --interval "${REPORT_INTERVAL}" \
-  --info-report-interval "${INFO_REPORT_INTERVAL}" &
-
-AGENT_PID=$!
+STOPPING=0
+AGENT_PID=""
 
 shutdown() {
+  STOPPING=1
   echo "shutting down gracefully..."
-  kill -TERM "${AGENT_PID}" "${HEALTH_PID}" 2>/dev/null || true
-  wait "${AGENT_PID}" 2>/dev/null || true
+
+  if [[ -n "${AGENT_PID}" ]]; then
+    kill -TERM "${AGENT_PID}" 2>/dev/null || true
+  fi
+
+  kill -TERM "${HEALTH_PID}" 2>/dev/null || true
+
+  if [[ -n "${AGENT_PID}" ]]; then
+    wait "${AGENT_PID}" 2>/dev/null || true
+  fi
+
   wait "${HEALTH_PID}" 2>/dev/null || true
   exit 0
 }
 
 trap shutdown TERM INT
 
-set +e
-wait -n "${AGENT_PID}" "${HEALTH_PID}"
-EXIT_CODE=$?
-set -e
+echo "Starting Komari Agent..."
+echo "Endpoint: ${AGENT_ENDPOINT}"
+echo "WebSSH: enabled"
+echo "Auto update: enabled"
 
-echo "A child process exited with code ${EXIT_CODE}, stopping container..."
-kill -TERM "${AGENT_PID}" "${HEALTH_PID}" 2>/dev/null || true
-wait "${AGENT_PID}" 2>/dev/null || true
-wait "${HEALTH_PID}" 2>/dev/null || true
+while true; do
+  /usr/local/bin/komari-agent \
+    --endpoint "${AGENT_ENDPOINT}" \
+    --token "${AGENT_TOKEN}" \
+    --max-retries "${MAX_RETRIES}" \
+    --reconnect-interval "${RECONNECT_INTERVAL}" \
+    --interval "${REPORT_INTERVAL}" \
+    --info-report-interval "${INFO_REPORT_INTERVAL}" &
 
-exit "${EXIT_CODE}"
+  AGENT_PID=$!
+
+  set +e
+  wait "${AGENT_PID}"
+  EXIT_CODE=$?
+  set -e
+
+  if [[ "${STOPPING}" -eq 1 ]]; then
+    exit 0
+  fi
+
+  echo "Komari Agent exited with code ${EXIT_CODE}."
+
+  if ! kill -0 "${HEALTH_PID}" 2>/dev/null; then
+    echo "Health server is not running, exiting."
+    cat /tmp/health-server.log 2>/dev/null || true
+    exit 1
+  fi
+
+  echo "Restarting Komari Agent in 5 seconds..."
+  sleep 5
+done
