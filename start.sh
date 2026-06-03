@@ -4,14 +4,14 @@ set -Eeuo pipefail
 : "${AGENT_ENDPOINT:?请设置 AGENT_ENDPOINT}"
 : "${AGENT_TOKEN:?请设置 AGENT_TOKEN}"
 
-export AGENT_DISABLE_WEB_SSH="${AGENT_DISABLE_WEB_SSH:-true}"
-export AGENT_DISABLE_AUTO_UPDATE="${AGENT_DISABLE_AUTO_UPDATE:-true}"
-export AGENT_MAX_RETRIES="${AGENT_MAX_RETRIES:-999999}"
-export AGENT_RECONNECT_INTERVAL="${AGENT_RECONNECT_INTERVAL:-10}"
-export AGENT_INTERVAL="${AGENT_INTERVAL:-5.0}"
-export AGENT_INFO_REPORT_INTERVAL="${AGENT_INFO_REPORT_INTERVAL:-15}"
+# DCDeploy 健康检查端口，固定 8000，不需要写环境变量
+HEALTH_PORT=8000
 
-HEALTH_PORT="${HEALTH_PORT:-${PORT:-8000}}"
+# Komari Agent 参数，直接写死在脚本里，不需要写环境变量
+MAX_RETRIES=999999
+RECONNECT_INTERVAL=10
+REPORT_INTERVAL=5.0
+INFO_REPORT_INTERVAL=15
 
 mkdir -p /www
 printf "ok\n" > /www/index.html
@@ -38,7 +38,13 @@ fi
 echo "Starting Komari Agent..."
 echo "Endpoint: ${AGENT_ENDPOINT}"
 
-/usr/local/bin/komari-agent &
+/usr/local/bin/komari-agent \
+  --endpoint "${AGENT_ENDPOINT}" \
+  --token "${AGENT_TOKEN}" \
+  --max-retries "${MAX_RETRIES}" \
+  --reconnect-interval "${RECONNECT_INTERVAL}" \
+  --interval "${REPORT_INTERVAL}" \
+  --info-report-interval "${INFO_REPORT_INTERVAL}" &
 
 AGENT_PID=$!
 
