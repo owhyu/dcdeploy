@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-: "${AGENT_ENDPOINT:?请设置 AGENT_ENDPOINT}"
-: "${AGENT_TOKEN:?请设置 AGENT_TOKEN}"
+: "${AGENT_ENDPOINT:?Environment variable AGENT_ENDPOINT is required}"
+: "${AGENT_TOKEN:?Environment variable AGENT_TOKEN is required}"
 
-# DCDeploy 健康检查端口
 HEALTH_PORT=8000
-
-# Komari Agent 固定参数，不写到环境变量里
 MAX_RETRIES=999999
 RECONNECT_INTERVAL=10
 REPORT_INTERVAL=5.0
