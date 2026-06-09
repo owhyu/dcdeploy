@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# test
 set -Eeuo pipefail
 
 : "${AGENT_ENDPOINT:?Environment variable AGENT_ENDPOINT is required}"
